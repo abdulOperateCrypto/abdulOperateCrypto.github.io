@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presale</title>
+  <script src="./js/ethers@6.13.2/ethers.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #logs {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f4f4f4;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+
+    input {
+      padding: 10px;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Presale Contract Interaction</h1>
+
+  <div id="logs"></div>
+
+  <button id="connectButton">Connect to MetaMask</button>
+  <button id="saleTokenBalanceCheckWalletButton" disabled>Check Sale Token Balance - Wallet</button>
+  <button id="usdtTokenBalanceCheckWalletButton" disabled>Check USDT Token Balance - Wallet</button>
+  <button id="saleTokenBalanceCheckContractButton" disabled>Check Sale Token Balance - Contract</button>
+  <button id="usdtTokenBalanceCheckContractButton" disabled>Check USDT Token Balance - Contract</button>
+  
+  <br><br>
+  <input type="text" id="mintAddress" placeholder="Mint Address"><br>
+  <input type="text" id="mintAmount" placeholder="Mint Amount"><br>
+  <button id="mintSaleTokenButton" disabled>Mint SaleToken</button>
+  <button id="mintUsdtTokenButton" disabled>Mint USDTToken</button>
+  
+  <br><br>
+  <input type="text" id="approveAddress" placeholder="Approve Address"><br>
+  <input type="text" id="approveAmount" placeholder="Approve Amount"><br>
+  <button id="approveSaleTokenButton" disabled>Approve SaleToken</button>
+  <button id="approveUsdtTokenButton" disabled>Approve USDTToken</button>
+
+  <br><br>
+  <input type="text" id="ownerAddress" placeholder="owner Address"><br>
+  <input type="text" id="spenderAddress" placeholder="spender Address"><br>
+  <button id="allowanceSaleTokenButton" disabled>Allowance SaleToken</button>
+  <button id="allowanceUsdtTokenButton" disabled>Allowance USDTToken</button>
+
+  <br><br>
+  <input type="text" id="BuyAmount" placeholder="USDT token Amount"><br>
+  <button id="BuyTokenButton" disabled>Buy Token</button>
+  
+  <br><br>
+  <button id="withdrawUSDTButton" disabled>Withdraw USDT Token</button>
+  <button id="withdrawTokenButton" disabled>Withdraw SALE Token</button>
+
+  <script>
+
+    let provider;
+    let signer;
+    let contract;
+
+    let MockTokenABI;
+    let PresaleABI;
+
+    let PresaleContract;
+    let UsdtContract;
+    let SaleTokenContract;
+
+    // ANVIL
+    // const USDT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    // const SALE_TOKEN_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    // const CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+
+    // SEPOLIA
+    const USDT_ADDRESS = "0xd985AFB0d80A0C151C98604b6d14643b892958a7"
+    const SALE_TOKEN_ADDRESS = "0xA2D1A5090A6EcCC37A961168a206897d9c667964"
+    const CONTRACT_ADDRESS = "0x0f4d0dE8119eFdc16Eb452BA8ec431756B06dF99"
+
+    const logs = document.getElementById("logs");
+
+    function log(message) {
+      logs.innerHTML += `<p>${message}</p>`;
+    }
+
+    log("USDT Token Address: " + USDT_ADDRESS);
+    log("Sale Token Address: " + SALE_TOKEN_ADDRESS);
+    log("Presale Contract Address: " + CONTRACT_ADDRESS);
+
+    const connectButton = document.getElementById("connectButton");
+    const saleTokenBalanceCheckWalletButton = document.getElementById("saleTokenBalanceCheckWalletButton");
+    const usdtTokenBalanceCheckWalletButton = document.getElementById("usdtTokenBalanceCheckWalletButton");
+    const saleTokenBalanceCheckContractButton = document.getElementById("saleTokenBalanceCheckContractButton");
+    const usdtTokenBalanceCheckContractButton = document.getElementById("usdtTokenBalanceCheckContractButton");
+    const mintSaleTokenButton = document.getElementById("mintSaleTokenButton");
+    const mintUsdtTokenButton = document.getElementById("mintUsdtTokenButton");
+    const BuyTokenButton = document.getElementById("BuyTokenButton");
+    const approveSaleTokenButton = document.getElementById("approveSaleTokenButton");
+    const approveUsdtTokenButton = document.getElementById("approveUsdtTokenButton");
+    const allowanceSaleTokenButton = document.getElementById("allowanceSaleTokenButton");
+    const allowanceUsdtTokenButton = document.getElementById("allowanceUsdtTokenButton");
+    const withdrawUSDTButton = document.getElementById("withdrawUSDTButton");
+    const withdrawTokenButton = document.getElementById("withdrawTokenButton");
+
+
+    // --------------------------------------------------------------------------------------------
+
+    fetch('./TokenPresale.json')
+      .then(response => response.json())
+      .then(data => {
+        PresaleABI = data.abi;
+      })
+      .catch(error => console.error('Error loading JSON:', error));
+
+    fetch('./MockToken.json')
+      .then(response => response.json())
+      .then(data => {
+        MockTokenABI = data.abi;
+      })
+      .catch(error => console.error('Error loading JSON:', error));
+
+    connectButton.addEventListener("click", async () => {
+      if (typeof window.ethereum !== "undefined") {
+        try {
+
+          console.log("clicked")
+
+          // Request account access
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+
+          // Create provider and signer
+          provider = new ethers.BrowserProvider(window.ethereum);
+          signer = await provider.getSigner();
+
+          // Log connection
+          const address = await signer.getAddress();
+          log(`Connected to MetaMask: ${address}`);
+
+          // // Initialize contract
+          UsdtContract = new ethers.Contract(USDT_ADDRESS, MockTokenABI, signer);
+          SaleTokenContract = new ethers.Contract(SALE_TOKEN_ADDRESS, MockTokenABI, signer);
+          PresaleContract = new ethers.Contract(CONTRACT_ADDRESS, PresaleABI, signer);
+
+          // // Enable call function button
+          saleTokenBalanceCheckWalletButton.disabled = false;
+          usdtTokenBalanceCheckWalletButton.disabled = false;
+          saleTokenBalanceCheckContractButton.disabled = false;
+          usdtTokenBalanceCheckContractButton.disabled = false;
+          mintSaleTokenButton.disabled = false;
+          mintUsdtTokenButton.disabled = false;
+          BuyTokenButton.disabled = false;
+          approveSaleTokenButton.disabled = false;
+          approveUsdtTokenButton.disabled = false;
+          allowanceSaleTokenButton.disabled = false;
+          allowanceUsdtTokenButton.disabled = false;
+          connectButton.disabled = true;
+          
+
+          provider.getNetwork().then(network => {
+            log(`Network: ${network.name}`);
+          });
+        } catch (error) {
+          log(`Error connecting to MetaMask: ${error.message}`);
+        }
+      } else {
+        log("MetaMask is not installed. Please install it to use this app.");
+      }
+    });
+
+    saleTokenBalanceCheckWalletButton.addEventListener("click", async () => {
+      if (SaleTokenContract) {
+        try {
+          const balance = await SaleTokenContract.balanceOf(await signer.getAddress());
+          const decimals = await SaleTokenContract.decimals();
+
+          log(`Sale Token Balance - Wallet: ${ethers.formatUnits(balance, decimals)}`);
+        } catch (error) {
+          log(`Error checking Sale Token balance: ${error.message}`);
+        }
+      }
+    });
+
+    usdtTokenBalanceCheckWalletButton.addEventListener("click", async () => {
+      if (UsdtContract) {
+        try {
+          const balance = await UsdtContract.balanceOf(await signer.getAddress());
+          const decimals = await UsdtContract.decimals();
+          log(`USDT Token Balance - Wallet: ${ethers.formatUnits(balance, decimals)}`);
+        } catch (error) {
+          log(`Error checking USDT Token balance: ${error.message}`);
+        }
+      }
+    });
+
+    saleTokenBalanceCheckContractButton.addEventListener("click", async () => {
+      if (PresaleContract) {
+        try {
+          const balance = await SaleTokenContract.balanceOf(CONTRACT_ADDRESS);
+          const decimals = await SaleTokenContract.decimals();
+          log(`Sale Token Balance - Contract: ${ethers.formatUnits(balance, decimals)}`);
+        } catch (error) {
+          log(`Error checking Sale Token balance: ${error.message}`);
+        }
+      }
+    });
+
+    usdtTokenBalanceCheckContractButton.addEventListener("click", async () => {
+      if (PresaleContract) {
+        try {
+          const balance = await UsdtContract.balanceOf(CONTRACT_ADDRESS);
+          const decimals = await UsdtContract.decimals();
+          log(`USDT Token Balance - Contract: ${ethers.formatUnits(balance, decimals)}`);
+        } catch (error) {
+          log(`Error checking USDT Token balance: ${error.message}`);
+        }
+      }
+    });
+
+    mintSaleTokenButton.addEventListener("click", async () => {
+      if (SaleTokenContract) {
+        try {
+          const mintAddress = document.getElementById("mintAddress").value;
+          const mintAmount = document.getElementById("mintAmount").value;
+
+          // check not null and valid address
+          if (!mintAddress || !ethers.isAddress(mintAddress)) {
+            log(`Invalid address: ${mintAddress}`);
+            return;
+          }
+
+          // check not null and valid amount
+          if (!mintAmount || isNaN(mintAmount) || mintAmount <= 0) {
+            log(`Invalid amount: ${mintAmount}`);
+            return;
+          }
+
+          const decimals = await SaleTokenContract.decimals();
+          const amount = ethers.parseUnits(mintAmount, decimals);
+
+          // console.log(amount, mintAmount, decimals)
+
+          const tx = await SaleTokenContract.mint(mintAddress, amount);
+          await tx.wait();
+          log(`Minted ${mintAmount} Sale Token to ${mintAddress}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    mintUsdtTokenButton.addEventListener("click", async () => {
+      if (UsdtContract) {
+        try {
+          const mintAddress = document.getElementById("mintAddress").value;
+          const mintAmount = document.getElementById("mintAmount").value;
+
+          // check not null and valid address
+          if (!mintAddress || !ethers.isAddress(mintAddress)) {
+            log(`Invalid address: ${mintAddress}`);
+            return;
+          }
+
+          // check not null and valid amount
+          if (!mintAmount || isNaN(mintAmount) || mintAmount <= 0) {
+            log(`Invalid amount: ${mintAmount}`);
+            return;
+          }
+
+          const decimals = await UsdtContract.decimals();
+          const amount = ethers.parseUnits(mintAmount, decimals);
+
+          // console.log(amount, mintAmount, decimals)
+
+          const tx = await UsdtContract.mint(mintAddress, amount);
+          await tx.wait();
+          log(`Minted ${mintAmount} USDT Token to ${mintAddress}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    BuyTokenButton.addEventListener("click", async () => {
+      if (PresaleContract && SaleTokenContract && UsdtContract) {
+        try {
+          const BuyAmount = document.getElementById("BuyAmount").value;
+
+          // check not null and valid address
+          if (!BuyAmount || isNaN(BuyAmount) || BuyAmount <= 0) {
+            log(`Invalid amount: ${BuyAmount}`);
+            return;
+          }
+
+
+          const decimals = await UsdtContract.decimals();
+          const amount = ethers.parseUnits(BuyAmount, decimals);
+
+          // console.log(amount, mintAmount, decimals)
+
+          const tx = await PresaleContract.swap(amount);
+          await tx.wait();
+          log(`Bought Sale Token with  ${BuyAmount} USDT`);
+
+          const balance = await SaleTokenContract.balanceOf(await signer.getAddress());
+          log(`Sale Token Balance - Wallet: ${balance}`);
+
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    approveSaleTokenButton.addEventListener("click", async () => {
+      if (SaleTokenContract) {
+        try {
+          const approveAddress = document.getElementById("approveAddress").value;
+          const approveAmount = document.getElementById("approveAmount").value;
+
+          // check not null and valid address
+          if (!approveAddress || !ethers.isAddress(approveAddress)) {
+            log(`Invalid address: ${approveAddress}`);
+            return;
+          }
+
+          // check not null and valid amount
+          if (!approveAmount || isNaN(approveAmount) || approveAmount <= 0) {
+            log(`Invalid amount: ${approveAmount}`);
+            return;
+          }
+
+          const decimals = await SaleTokenContract.decimals();
+          const amount = ethers.parseUnits(approveAmount, decimals);
+
+          // console.log(amount, mintAmount, decimals)
+
+          const tx = await SaleTokenContract.approve(approveAddress, amount);
+          await tx.wait();
+          log(`Approved ${approveAmount} Sale Token to ${approveAddress}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    approveUsdtTokenButton.addEventListener("click", async () => {
+      if (UsdtContract) {
+        try {
+          const approveAddress = document.getElementById("approveAddress").value;
+          const approveAmount = document.getElementById("approveAmount").value;
+
+          // check not null and valid address
+          if (!approveAddress || !ethers.isAddress(approveAddress)) {
+            log(`Invalid address: ${approveAddress}`);
+            return;
+          }
+
+          // check not null and valid amount
+          if (!approveAmount || isNaN(approveAmount) || approveAmount <= 0) {
+            log(`Invalid amount: ${approveAmount}`);
+            return;
+          }
+
+          const decimals = await UsdtContract.decimals();
+          const amount = ethers.parseUnits(approveAmount, decimals);
+
+          // console.log(amount, mintAmount, decimals)
+
+          const tx = await UsdtContract.approve(approveAddress, amount);
+          await tx.wait();
+          log(`Approved ${approveAmount} USDT Token to ${approveAddress}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    allowanceSaleTokenButton.addEventListener("click", async () => {
+      if (SaleTokenContract) {
+        try {
+          const ownerAddress = document.getElementById("ownerAddress").value;
+          const spenderAddress = document.getElementById("spenderAddress").value;
+
+          // check not null and valid address
+          if (!ownerAddress || !ethers.isAddress(ownerAddress)) {
+            log(`Invalid address: ${ownerAddress}`);
+            return;
+          }
+
+          // check not null and valid address
+          if (!spenderAddress || !ethers.isAddress(spenderAddress)) {
+            log(`Invalid address: ${spenderAddress}`);
+            return;
+          }
+
+          const allowance = await SaleTokenContract.allowance(ownerAddress, spenderAddress);
+          const decimals = await SaleTokenContract.decimals();
+          log(`Allowance Sale Token from ${ownerAddress} to ${spenderAddress} is ${ethers.formatUnits(allowance, decimals)}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    allowanceUsdtTokenButton.addEventListener("click", async () => {
+      if (UsdtContract) {
+        try {
+          const ownerAddress = document.getElementById("ownerAddress").value;
+          const spenderAddress = document.getElementById("spenderAddress").value;
+
+          // check not null and valid address
+          if (!ownerAddress || !ethers.isAddress(ownerAddress)) {
+            log(`Invalid address: ${ownerAddress}`);
+            return;
+          }
+
+          // check not null and valid address
+          if (!spenderAddress || !ethers.isAddress(spenderAddress)) {
+            log(`Invalid address: ${spenderAddress}`);
+            return;
+          }
+
+          const allowance = await UsdtContract.allowance(ownerAddress, spenderAddress);
+          const decimals = await UsdtContract.decimals();
+          log(`Allowance USDT Token from ${ownerAddress} to ${spenderAddress} is ${ethers.formatUnits(allowance, decimals)}`);
+        } catch (error) {
+          log(`Error minting Sale Token: ${error.message}`);
+        }
+      }
+    });
+
+    withdrawUSDTButton.addEventListener("click", async () => {
+      if (PresaleContract) {
+        try {
+          const tx = await PresaleContract.withdrawUSDT();
+          await tx.wait();
+          log(`Withdrawed USDT Token from contract`);
+        } catch (error) {
+          log(`Error withdrawing USDT Token: ${error.message}`);
+        }
+      }
+    });
+
+    withdrawTokenButton.addEventListener("click", async () => {
+      if (PresaleContract) {
+        try {
+          const tx = await PresaleContract.withdrawTokens();
+          await tx.wait();
+          log(`Withdrawed Sale Token from contract`);
+        } catch (error) {
+          log(`Error withdrawing Sale Token: ${error.message}`);
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
